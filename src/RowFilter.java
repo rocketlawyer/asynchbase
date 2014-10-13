@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012  The Async HBase Authors.  All rights reserved.
+ * Copyright (C) 2014  The Async HBase Authors.  All rights reserved.
  * This file is part of Async HBase.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,40 +26,35 @@
  */
 package org.hbase.async;
 
+import org.hbase.async.generated.FilterPB;
+
 /**
- * An unclassified exception that occurred on the server side.
+ * Filter rows based on the rowkey. Takes an operator (equal, greater,
+ * not equal, etc). and a filter comparator.
+ * @since 1.6
  */
-public final class RemoteException extends NonRecoverableException {
+public final class RowFilter extends CompareFilter {
 
-  private final String type;
+  private static final byte[] NAME =
+      Bytes.UTF8("org.apache.hadoop.hbase.filter.RowFilter");
 
-  /**
-   * Constructor.
-   * @param type The name of the class of the remote exception.
-   * @param msg The message of the exception, potentially including a stack
-   * trace.
-   */
-  RemoteException(final String type, final String msg) {
-    super(msg);
-    this.type = type;
-  }
-
-  /**
-   * Returns the name of the class of the remote exception.
-   */
-  public String getType() {
-    return type;
+  public RowFilter(final CompareOp rowCompareOp,
+                   final FilterComparator rowComparator) {
+    super(rowCompareOp, rowComparator);
   }
 
   @Override
-  RemoteException make(final Object msg, final HBaseRpc rpc) {
-    if (msg == this || msg instanceof RemoteException) {
-      final RemoteException e = (RemoteException) msg;
-      return new RemoteException(e.getType(), e.getMessage());
-    }
-    return new RemoteException(msg.getClass().getName(), msg.toString());
+  byte[] name() {
+    return NAME;
   }
 
-  private static final long serialVersionUID = 1279775242;
-
+  @Override
+  byte[] serialize() {
+    return FilterPB
+        .RowFilter
+        .newBuilder()
+        .setCompareFilter(toProtobuf())
+        .build()
+        .toByteArray();
+  }
 }

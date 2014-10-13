@@ -97,6 +97,8 @@ final class RegionClient extends ReplayingDecoder<VoidEnum> {
                                new NoSuchColumnFamilyException(null, null));
     REMOTE_EXCEPTION_TYPES.put(NotServingRegionException.REMOTE_CLASS,
                                new NotServingRegionException(null, null));
+    REMOTE_EXCEPTION_TYPES.put(RegionMovedException.REMOTE_CLASS,
+                               new RegionMovedException(null, null));
     REMOTE_EXCEPTION_TYPES.put(UnknownScannerException.REMOTE_CLASS,
                                new UnknownScannerException(null, null));
     REMOTE_EXCEPTION_TYPES.put(UnknownRowLockException.REMOTE_CLASS,
@@ -1337,8 +1339,13 @@ final class RegionClient extends ReplayingDecoder<VoidEnum> {
         decoded = deserialize(buf, rpc);
       }
     } catch (RuntimeException e) {
-      LOG.error("Uncaught error during de-serialization of " + rpc
-                + ", rpcid=" + rpcid);
+      final String msg = "Uncaught error during de-serialization of " + rpc
+        + ", rpcid=" + rpcid;
+      LOG.error(msg);
+      if (!(e instanceof HBaseException)) {
+        e = new NonRecoverableException(msg, e);
+      }
+      rpc.callback(e);
       throw e;
     }
 
@@ -1354,13 +1361,14 @@ final class RegionClient extends ReplayingDecoder<VoidEnum> {
       assert rpc == removed;
     }
 
-    if (decoded instanceof NotServingRegionException
+    if ((decoded instanceof NotServingRegionException ||
+         decoded instanceof RegionMovedException)
         && rpc.getRegion() != null) {
       // We only handle NSREs for RPCs targeted at a specific region, because
       // if we don't know which region caused the NSRE (e.g. during multiPut)
       // we can't do anything about it.
       hbase_client.handleNSRE(rpc, rpc.getRegion().name(),
-                              (NotServingRegionException) decoded);
+                              (RecoverableException) decoded);
       return null;
     }
 

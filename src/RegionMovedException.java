@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012  The Async HBase Authors.  All rights reserved.
+ * Copyright (C) 2014  The Async HBase Authors.  All rights reserved.
  * This file is part of Async HBase.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,14 +27,15 @@
 package org.hbase.async;
 
 /**
- * Exception thrown when we attempted to use a region that wasn't serving from
- * that particular RegionServer.  It probably moved somewhere else.
+ * Exception thrown when we attempted to use a region that was moved from
+ * that particular RegionServer to a new one.
+ * @since 1.6
  */
-public final class NotServingRegionException extends RecoverableException
+public final class RegionMovedException extends RecoverableException
 implements HasFailedRpcException {
 
   static final String REMOTE_CLASS =
-    "org.apache.hadoop.hbase.NotServingRegionException";
+    "org.apache.hadoop.hbase.exceptions.RegionMovedException";
 
   final HBaseRpc failed_rpc;
 
@@ -43,7 +44,7 @@ implements HasFailedRpcException {
    * @param msg The message of the exception, potentially with a stack trace.
    * @param failed_rpc The RPC that caused this exception, if known, or null.
    */
-  NotServingRegionException(final String msg, final HBaseRpc failed_rpc) {
+  RegionMovedException(final String msg, final HBaseRpc failed_rpc) {
     super(msg);
     this.failed_rpc = failed_rpc;
   }
@@ -64,14 +65,9 @@ implements HasFailedRpcException {
   }
 
   @Override
-  NotServingRegionException make(final Object msg, final HBaseRpc rpc) {
-    if (msg == this || msg instanceof NotServingRegionException) {
-      final NotServingRegionException e = (NotServingRegionException) msg;
-      return new NotServingRegionException(e.getMessage(), rpc);
-    }
-    return new NotServingRegionException(msg.toString(), rpc);
+  RegionMovedException make(final Object msg, final HBaseRpc rpc) {
+    return new RegionMovedException(msg.toString(), rpc);
   }
 
-  private static final long serialVersionUID = 1281000942;
-
+  private static final long serialVersionUID = 1411866342;
 }

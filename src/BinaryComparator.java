@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012  The Async HBase Authors.  All rights reserved.
+ * Copyright (C) 2014  The Async HBase Authors.  All rights reserved.
  * This file is part of Async HBase.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,40 +26,70 @@
  */
 package org.hbase.async;
 
+import com.google.protobuf.ByteString;
+import org.jboss.netty.buffer.ChannelBuffer;
+
+import org.hbase.async.generated.ComparatorPB;
+
 /**
- * An unclassified exception that occurred on the server side.
+ * A binary comparator used in comparison filters. Compares byte arrays
+ * lexicographically.
+ * @since 1.6
  */
-public final class RemoteException extends NonRecoverableException {
+public final class BinaryComparator extends FilterComparator {
 
-  private final String type;
+  private static final byte[] NAME =
+      Bytes.UTF8("org.apache.hadoop.hbase.filter.BinaryComparator");
+  private static final byte CODE = 47;
 
-  /**
-   * Constructor.
-   * @param type The name of the class of the remote exception.
-   * @param msg The message of the exception, potentially including a stack
-   * trace.
-   */
-  RemoteException(final String type, final String msg) {
-    super(msg);
-    this.type = type;
+  private final byte[] value;
+
+  public BinaryComparator(byte[] value) {
+    this.value = value;
   }
 
-  /**
-   * Returns the name of the class of the remote exception.
-   */
-  public String getType() {
-    return type;
+  public byte[] value() {
+    return value.clone();
   }
 
   @Override
-  RemoteException make(final Object msg, final HBaseRpc rpc) {
-    if (msg == this || msg instanceof RemoteException) {
-      final RemoteException e = (RemoteException) msg;
-      return new RemoteException(e.getType(), e.getMessage());
-    }
-    return new RemoteException(msg.getClass().getName(), msg.toString());
+  byte[] name() {
+    return NAME;
   }
 
-  private static final long serialVersionUID = 1279775242;
+  @Override
+  ComparatorPB.Comparator toProtobuf() {
+    ByteString byte_string = ComparatorPB
+      .BinaryComparator
+      .newBuilder()
+      .setComparable(
+          ComparatorPB
+            .ByteArrayComparable
+            .newBuilder()
+            .setValue(Bytes.wrap(value)))
+      .build()
+      .toByteString();
+    return super.toProtobuf(byte_string);
+  }
 
+  @Override
+  void serializeOld(ChannelBuffer buf) {
+    super.serializeOld(buf);              // super.predictSerializedSize()
+    // Write class code
+    buf.writeByte(CODE);                  // 1
+    // Write value
+    HBaseRpc.writeByteArray(buf, value);  // 3 + value.length
+  }
+
+  @Override
+  int predictSerializedSize() {
+    return 1 + 3 + value.length;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("%s(%s)",
+        getClass().getSimpleName(),
+        Bytes.pretty(value));
+  }
 }
